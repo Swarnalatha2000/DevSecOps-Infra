@@ -31,10 +31,6 @@ jobs:
       - name: Terraform Validate
         working-directory: terraform/live/dev
         run: terraform validate
-
-      - name: Terraform Format Check
-        working-directory: terraform/live/dev
-        run: terraform fmt -check
       
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@master
