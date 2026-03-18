@@ -9,6 +9,20 @@ resource "aws_s3_bucket" "source" {
 resource "aws_s3_bucket" "destination" {
   bucket = "terraform-destination"
 }
+#Enabling the logging
+resource "aws_s3_bucket_logging" "log" {
+    bucket = aws_s3_bucket.log.id
+    
+    target_bucket = aws_s3_bucket.source.id
+    target_prefix = "log/"
+}
+
+resource "aws_s3_bucket_logging" "logdes" {
+    bucket = aws_s3_bucket.logdes.id
+    
+    target_bucket = aws_s3_bucket.destination.id
+    target_prefix = "log/"
+}
 
 resource "aws_s3_bucket_public_access_block" "buckpolicysource" {
     bucket = aws_s3_bucket.source.id
