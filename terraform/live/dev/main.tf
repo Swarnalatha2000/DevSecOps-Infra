@@ -2,12 +2,25 @@ provider "aws" {
     region = "ap-south-1"
 }
 
-resource "aws_s3_bucket" "mys3" {
+resource "aws_s3_bucket" "source" {
     bucket = "terraform-cicd"
 }
 
-resource "aws_s3_bucket_public_access_block" "buckpolicy" {
-    bucket = aws_s3_bucket.mys3.id
+resource "aws_s3_bucket" "destination" {
+  bucket = "terraform-destination"
+}
+
+resource "aws_s3_bucket_public_access_block" "buckpolicysource" {
+    bucket = aws_s3_bucket.source.id
+    
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_public_access_block" "buckpolicydestination" {
+    bucket = aws_s3_bucket.destination.id
     
     block_public_acls       = true
     block_public_policy     = true
@@ -18,16 +31,25 @@ resource "aws_s3_bucket_public_access_block" "buckpolicy" {
 # Log bucket and logs were enabled
 resource "aws_s3_bucket" "logs" {
   bucket = "my-app-s3-logs"
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
-resource "aws_s3_bucket_logging" "log_config" {
-  bucket        = aws_s3_bucket.mys3.id
+resource "aws_s3_bucket_logging" "log_configsource" {
+  bucket        = aws_s3_bucket.source.id
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "access-logs/"
+}
+
+resource "aws_s3_bucket_logging" "log_configdestination" {
+  bucket        = aws_s3_bucket.destination.id
   target_bucket = aws_s3_bucket.logs.id
   target_prefix = "access-logs/"
 }
 
 resource "aws_s3_bucket_versioning" "myver" {
-  bucket = aws_s3_bucket.mys3.id
+  bucket = aws_s3_bucket.source.id
   versioning_configuration {
     status = "Enabled"
   }
@@ -40,14 +62,51 @@ resource "aws_s3_bucket_versioning" "destver" {
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "versioning-bucket-config" {
+resource "aws_s3_bucket_lifecycle_configuration" "versioning-bucket-config-source" {
   # Must have bucket versioning enabled first
   depends_on = [aws_s3_bucket_versioning.myver]
 
-  bucket = aws_s3_bucket.mys3.id
+  bucket = aws_s3_bucket.source.id
 
   rule {
     id = "default-lifecycle-rule"
+    abort_incomplete_multipart_upload {
+        days_after_initiation = 7
+    }
+
+    filter {
+      prefix = ""
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    noncurrent_version_transition {
+      noncurrent_days = 30
+      storage_class   = "STANDARD_IA"
+    }
+
+    noncurrent_version_transition {
+      noncurrent_days = 60
+      storage_class   = "GLACIER"
+    }
+
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "versioning-bucket-config-destination" {
+  # Must have bucket versioning enabled first for destination
+  depends_on = [aws_s3_bucket_versioning.destver]
+
+  bucket = aws_s3_bucket.destination.id
+
+  rule {
+    id = "default-lifecycle-rule-destination"
+    abort_incomplete_multipart_upload {
+        days_after_initiation = 7
+    }
 
     filter {
       prefix = ""
@@ -72,11 +131,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "versioning-bucket-config" {
 }
 
 # Enabling the notification event through SNS
-resource "aws_sns_topic" "mysns" {
+resource "aws_sns_topic" "mysnssource" {
   name = "my-topic"
+  kms_master_key_id = "alias/aws/sns"
 }
 
-data "aws_iam_policy_document" "sns_s3_publish" {
+data "aws_iam_policy_document" "sns_s3_publish_source" {
   statement {
     sid = "AllowS3Publish"
     effect = "Allow"
@@ -91,27 +151,72 @@ data "aws_iam_policy_document" "sns_s3_publish" {
     ]
 
     resources = [
-      aws_sns_topic.mysns.arn
+      aws_sns_topic.mysnssource.arn
     ]
 
     condition {
       test     = "ArnLike"
       variable = "aws:SourceArn"
-      values   = [aws_s3_bucket.mys3.arn]   # your S3 bucket
+      values   = [aws_s3_bucket.source.arn]   # your S3 bucket
     }
   }
 }
 
 resource "aws_sns_topic_policy" "sns_policy" {
-  arn    = aws_sns_topic.mysns.arn
-  policy = data.aws_iam_policy_document.sns_s3_publish.json
+  arn    = aws_sns_topic.mysnssource.arn
+  policy = data.aws_iam_policy_document.sns_s3_publish_source.json
+}
+
+resource "aws_s3_bucket_notification" "sns_trigger_source" {
+  bucket = aws_s3_bucket.source.id
+
+  topic {
+    topic_arn = aws_sns_topic.mysnssource.arn
+    events    = ["s3:ObjectRemoved:*"]
+  }
+}
+
+resource "aws_sns_topic" "mysnsdestination" {
+  name = "my-topic"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+data "aws_iam_policy_document" "sns_s3_publish_destination" {
+  statement {
+    sid = "AllowS3Publish"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions = [
+      "sns:Publish"
+    ]
+
+    resources = [
+      aws_sns_topic.mysnsdestination.arn
+    ]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.destination.arn]   # your S3 bucket
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "sns_policy_destination" {
+  arn    = aws_sns_topic.mysnsdestination.arn
+  policy = data.aws_iam_policy_document.sns_s3_publish_destination.json
 }
 
 resource "aws_s3_bucket_notification" "sns_trigger" {
-  bucket = aws_s3_bucket.mys3.id
+  bucket = aws_s3_bucket.destination.id
 
   topic {
-    topic_arn = aws_sns_topic.mysns.arn
+    topic_arn = aws_sns_topic.mysnsdestination.arn
     events    = ["s3:ObjectRemoved:*"]
   }
 }
@@ -120,15 +225,51 @@ resource "aws_s3_bucket_notification" "sns_trigger" {
 resource "aws_kms_key" "mykey" {
   description             = "This key is used to encrypt bucket objects"
   deletion_window_in_days = 10
+  enable_key_rotation    = true
+  policy      = <<POLICY
+  {
+    "Version": "2012-10-17",
+    "Id": "default",
+    "Statement": [
+      {
+        "Sid": "DefaultAllow",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::123456789012:root"
+        },
+        "Action": "kms:*",
+        "Resource": "*"
+      }
+    ]
+  }
+POLICY
 }
 
 resource "aws_kms_key" "dest_key" {
   description             = "This key is used to encrypt bucket objects -destination key"
   deletion_window_in_days = 10
+  enable_key_rotation    = true
+  policy      = <<POLICY
+  {
+    "Version": "2012-10-17",
+    "Id": "default",
+    "Statement": [
+      {
+        "Sid": "DefaultAllow",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::123456789012:root"
+        },
+        "Action": "kms:*",
+        "Resource": "*"
+      }
+    ]
+  }
+POLICY
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "mykms" {
-  bucket = aws_s3_bucket.mys3.id
+  bucket = aws_s3_bucket.source.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -182,8 +323,8 @@ data "aws_iam_policy_document" "replication_policy" {
     ]
 
     resources = [
-      aws_s3_bucket.mys3.arn,
-      "${aws_s3_bucket.mys3.arn}/*"
+      aws_s3_bucket.source.arn,
+      "${aws_s3_bucket.source.arn}/*"
     ]
   }
 
@@ -232,11 +373,6 @@ resource "aws_iam_role_policy_attachment" "replication_attach" {
 }
 
 # Enabling cross region replication
-
-resource "aws_s3_bucket" "destination" {
-  bucket = "terraform-destination"
-}
-
 resource "aws_s3_bucket_replication_configuration" "replication" {
   region = "eu-central-1"
 
@@ -244,7 +380,7 @@ resource "aws_s3_bucket_replication_configuration" "replication" {
   depends_on = [aws_s3_bucket_versioning.destver]
 
   role   = aws_iam_role.replication_role.arn
-  bucket = aws_s3_bucket.mys3.id
+  bucket = aws_s3_bucket.source.id
 
   rule {
     id = "examplerule"
