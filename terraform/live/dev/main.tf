@@ -9,16 +9,25 @@ resource "aws_s3_bucket" "source" {
 resource "aws_s3_bucket" "destination" {
   bucket = "terraform-destination"
 }
+
+resource "aws_s3_bucket" "sourcelog" {
+    bucket = "terraform-cicd-sourcelog"
+}
+
+resource "aws_s3_bucket" "destinationlog" {
+  bucket = "terraform-cicd-destinationlog"
+}
+
 #Enabling the logging
-resource "aws_s3_bucket_logging" "log" {
-    bucket = aws_s3_bucket.log.id
+resource "aws_s3_bucket_logging" "slog" {
+    bucket = aws_s3_bucket.sourcelog.id
     
     target_bucket = aws_s3_bucket.source.id
     target_prefix = "log/"
 }
 
-resource "aws_s3_bucket_logging" "logdes" {
-    bucket = aws_s3_bucket.logdes.id
+resource "aws_s3_bucket_logging" "dlog" {
+    bucket = aws_s3_bucket.destinationlog.id
     
     target_bucket = aws_s3_bucket.destination.id
     target_prefix = "log/"
