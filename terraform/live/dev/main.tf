@@ -28,23 +28,6 @@ resource "aws_s3_bucket_public_access_block" "buckpolicydestination" {
     restrict_public_buckets = true
 }
 
-# Log bucket and logs were enabled
-resource "aws_s3_bucket" "logs" {
-  bucket = "my-app-s3-logs"
-}
-
-resource "aws_s3_bucket_logging" "log_configsource" {
-  bucket        = aws_s3_bucket.source.id
-  target_bucket = aws_s3_bucket.logs.id
-  target_prefix = "access-logs/"
-}
-
-resource "aws_s3_bucket_logging" "log_configdestination" {
-  bucket        = aws_s3_bucket.destination.id
-  target_bucket = aws_s3_bucket.logs.id
-  target_prefix = "access-logs/"
-}
-
 resource "aws_s3_bucket_versioning" "myver" {
   bucket = aws_s3_bucket.source.id
   versioning_configuration {
@@ -168,8 +151,9 @@ resource "aws_s3_bucket_notification" "sns_trigger_source" {
   bucket = aws_s3_bucket.source.id
 
   topic {
-    topic_arn = aws_sns_topic.mysnssource.arn
-    events    = ["s3:ObjectRemoved:*"]
+    topic_arn     = aws_sns_topic.mysnssource.arn
+    events        = ["s3:ObjectRemoved:*"]
+    filter_prefix = "logs/"
   }
 }
 
@@ -213,8 +197,9 @@ resource "aws_s3_bucket_notification" "sns_trigger" {
   bucket = aws_s3_bucket.destination.id
 
   topic {
-    topic_arn = aws_sns_topic.mysnsdestination.arn
-    events    = ["s3:ObjectRemoved:*"]
+    topic_arn     = aws_sns_topic.mysnsdestination.arn
+    events        = ["s3:ObjectRemoved:*"]
+    filter_prefix = "logs/"
   }
 }
 
@@ -281,8 +266,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "dest_enc" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
       kms_master_key_id = aws_kms_key.dest_key.arn
+      sse_algorithm     = "aws:kms"
     }
   }
 }
