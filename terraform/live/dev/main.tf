@@ -72,11 +72,46 @@ resource "aws_s3_bucket_lifecycle_configuration" "versioning-bucket-config" {
 }
 
 # Enabling the notification event through SNS
+resource "aws_sns_topic" "mysns" {
+  name = "my-topic"
+}
+
+data "aws_iam_policy_document" "sns_s3_publish" {
+  statement {
+    sid = "AllowS3Publish"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions = [
+      "sns:Publish"
+    ]
+
+    resources = [
+      aws_sns_topic.mysns.arn
+    ]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.mys3.arn]   # your S3 bucket
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "sns_policy" {
+  arn    = aws_sns_topic.mysns.arn
+  policy = data.aws_iam_policy_document.sns_s3_publish.json
+}
+
 resource "aws_s3_bucket_notification" "sns_trigger" {
   bucket = aws_s3_bucket.mys3.id
 
   topic {
-    topic_arn = aws_sns_topic.topic.arn
+    topic_arn = aws_sns_topic.mysns.arn
     events    = ["s3:ObjectRemoved:*"]
   }
 }
@@ -147,8 +182,8 @@ data "aws_iam_policy_document" "replication_policy" {
     ]
 
     resources = [
-      aws_s3_bucket.source.arn,
-      "${aws_s3_bucket.source.arn}/*"
+      aws_s3_bucket.mys3.arn,
+      "${aws_s3_bucket.mys3.arn}/*"
     ]
   }
 
@@ -206,10 +241,10 @@ resource "aws_s3_bucket_replication_configuration" "replication" {
   region = "eu-central-1"
 
   # Must have bucket versioning enabled first
-  depends_on = [aws_s3_bucket_versioning.mys3]
+  depends_on = [aws_s3_bucket_versioning.destver]
 
-  role   = aws_iam_role.replication.arn
-  bucket = aws_s3_bucket.source.id
+  role   = aws_iam_role.replication_role.arn
+  bucket = aws_s3_bucket.mys3.id
 
   rule {
     id = "examplerule"
