@@ -31,9 +31,6 @@ resource "aws_s3_bucket_public_access_block" "buckpolicydestination" {
 # Log bucket and logs were enabled
 resource "aws_s3_bucket" "logs" {
   bucket = "my-app-s3-logs"
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 resource "aws_s3_bucket_logging" "log_configsource" {
