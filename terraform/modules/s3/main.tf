@@ -43,8 +43,9 @@ resource "aws_s3_bucket_public_access_block" "this" {
 
 # Logging resource
 resource "aws_s3_bucket_logging" "this" {
+    count  = var.enable_logging && var.log_bucket != null ? 1 : 0
+
     bucket = aws_s3_bucket.this.id
-    
     target_bucket = var.log_bucket
     target_prefix = "log/"
 }
