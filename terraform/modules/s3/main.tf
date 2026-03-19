@@ -5,7 +5,7 @@ resource "aws_s3_bucket" "this" {
 resource "aws_s3_bucket_logging" "this" {
     bucket = aws_s3_bucket.this.id
     
-    target_bucket = aws_s3_bucket.source.id
+    target_bucket = var.buckets["destination"].name
     target_prefix = "log/"
 }
 
