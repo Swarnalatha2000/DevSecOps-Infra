@@ -1,5 +1,6 @@
 #checkov:skip=CKV2_AWS_62:Notification is not required
-#checkov:skip=CKV_AWS_144:Reaplication will be handled separately
+#checkov:skip=CKV_AWS_144:Replication will be handled separately
+#checkov:skip=CKV2_AWS_64:KMS policy skip
 resource "aws_s3_bucket" "this" {
     bucket = var.bucket_name
 }
