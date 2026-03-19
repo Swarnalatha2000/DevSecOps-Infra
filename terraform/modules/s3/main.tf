@@ -139,59 +139,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   }
 }
 
-data "aws_iam_policy_document" "this" {
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "s3:GetObject",
-      "s3:GetObjectVersion",
-      "s3:GetObjectVersionAcl",
-      "s3:GetObjectVersionForReplication",
-      "s3:GetObjectVersionTagging",
-      "s3:ListBucket"
-    ]
-
-    resources = [
-      aws_s3_bucket.this.arn,
-      "${aws_s3_bucket.this.arn}/*"
-    ]
-  }
-
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "s3:ReplicateObject",
-      "s3:ReplicateDelete",
-      "s3:ReplicateTags",
-      "s3:ObjectOwnerOverrideToBucketOwner"
-    ]
-
-    resources = [
-      aws_s3_bucket.this.arn,
-      "${aws_s3_bucket.this.arn}/*"
-    ]
-  }
-
-  # KMS permissions for replicating encrypted objects
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*"
-    ]
-
-    resources = [
-      aws_kms_key.this.arn,
-      aws_kms_key.this.arn
-    ]
-  }
-}
-
 resource "aws_iam_role" "this" {
   name               = "s3-replication-role"
   assume_role_policy = data.aws_iam_policy_document.this.json
