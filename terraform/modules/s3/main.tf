@@ -2,13 +2,7 @@ resource "aws_s3_bucket" "this" {
     bucket = var.bucket_name
 }
 
-resource "aws_s3_bucket_logging" "this" {
-    bucket = aws_s3_bucket.this.id
-    
-    target_bucket = var.buckets["destination"].name
-    target_prefix = "log/"
-}
-
+# versioning_configuration
 resource "aws_s3_bucket_versioning" "this" {
   bucket = aws_s3_bucket.this.id
   versioning_configuration {
@@ -16,6 +10,18 @@ resource "aws_s3_bucket_versioning" "this" {
   }
 }
 
+# server side encryption configuration
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "AES256"
+    }
+  }
+}
+
+# Public access block
 resource "aws_s3_bucket_public_access_block" "this" {
     bucket = aws_s3_bucket.this.id
     
@@ -25,6 +31,14 @@ resource "aws_s3_bucket_public_access_block" "this" {
     restrict_public_buckets = true
 }
 
+# Logging resource
+resource "aws_s3_bucket_logging" "this" {
+    bucket = aws_s3_bucket.this.id
+    
+    target_bucket = var.log_bucket
+    target_prefix = "log/"
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   # Must have bucket versioning enabled first
   depends_on = [aws_s3_bucket_versioning.this]
@@ -32,13 +46,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   bucket = aws_s3_bucket.this.id
 
   rule {
-    id = "default-lifecycle-rule"
+    id = "lifecycle-rule"
     abort_incomplete_multipart_upload {
         days_after_initiation = 7
-    }
-
-    filter {
-      prefix = ""
     }
 
     noncurrent_version_expiration {
@@ -56,126 +66,5 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     }
 
     status = "Enabled"
-  }
-}
-
-resource "aws_sns_topic" "this" {
-  name = "my-topic"
-  kms_master_key_id = "alias/aws/sns"
-}
-
-data "aws_iam_policy_document" "this" {
-  statement {
-    sid = "AllowS3Publish"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["s3.amazonaws.com"]
-    }
-
-    actions = [
-      "sns:Publish"
-    ]
-
-    resources = [
-      aws_sns_topic.this.arn
-    ]
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = [aws_s3_bucket.this.arn]   # your S3 bucket
-    }
-  }
-}
-
-resource "aws_sns_topic_policy" "this" {
-  arn    = aws_sns_topic.this.arn
-  policy = data.aws_iam_policy_document.this.json
-}
-
-resource "aws_s3_bucket_notification" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  topic {
-    topic_arn     = aws_sns_topic.this.arn
-    events        = ["s3:ObjectRemoved:*"]
-    filter_prefix = "logs/"
-  }
-}
-
-resource "aws_kms_key" "this" {
-  description             = "This key is used to encrypt bucket objects"
-  deletion_window_in_days = 10
-  enable_key_rotation    = true
-  policy      = <<POLICY
-  {
-    "Version": "2012-10-17",
-    "Id": "default",
-    "Statement": [
-      {
-        "Sid": "DefaultAllow",
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "arn:aws:iam::123456789012:root"
-        },
-        "Action": "kms:*",
-        "Resource": "*"
-      }
-    ]
-  }
-POLICY
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.this.arn
-      sse_algorithm     = "aws:kms"
-    }
-  }
-}
-
-resource "aws_iam_role" "this" {
-  name               = "s3-replication-role"
-  assume_role_policy = data.aws_iam_policy_document.this.json
-}
-
-resource "aws_iam_policy" "this" {
-  name   = "S3ReplicationPolicy"
-  policy = data.aws_iam_policy_document.this.json
-}
-
-resource "aws_iam_role_policy_attachment" "this" {
-  role       = aws_iam_role.this.name
-  policy_arn = aws_iam_policy.this.arn
-}
-
-# Enabling cross region replication
-resource "aws_s3_bucket_replication_configuration" "this" {
-  region = "eu-central-1"
-
-  # Must have bucket versioning enabled first
-  depends_on = [aws_s3_bucket_versioning.this]
-
-  role   = aws_iam_role.this.arn
-  bucket = aws_s3_bucket.this.id
-
-  rule {
-    id = "examplerule"
-
-    filter {
-      prefix = "example"
-    }
-
-    status = "Enabled"
-
-    destination {
-      bucket        = aws_s3_bucket.this.arn
-      storage_class = "STANDARD"
-    }
   }
 }
