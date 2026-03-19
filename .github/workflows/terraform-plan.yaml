@@ -81,14 +81,14 @@ jobs:
         run: terraform init
 
       - name: Show Action Inputs
-        run: echo "Environment: ${{ env.ENV }}, Action: ${{ env.ACTION }}"
+        run: echo 'Environment: ${{ env.ENV }}, Action: ${{ env.ACTION }}''
 
       - name: Terraform Apply
         if: ${{ env.ACTION == 'apply' }}
         working-directory: terraform/live/${{ env.ENV }}
-        run: terraform apply -var-file=${{ env.ENV }}.tfvars tfplan -auto-approve
+        run: terraform apply -auto-approve -var-file=${{ env.ENV }}.tfvars
 
       - name: Terraform Destroy
         if: ${{ env.ACTION == 'destroy' }}
         working-directory: terraform/live/${{ env.ENV }}
-        run: terraform destroy -var-file=${{ env.ENV }}.tfvars -auto-approve
+        run: terraform destroy -auto-approve -var-file=${{ env.ENV }}.tfvars
