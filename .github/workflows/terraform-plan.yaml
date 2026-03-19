@@ -41,4 +41,5 @@ jobs:
           skip_check: CKV_AWS_144,CKV2_AWS_62,CKV2_AWS_64
 
       - name: Terraform Plan
-        run: terraform plan
+        working-directory: terraform/live/dev
+        run: terraform plan -var-file=dev.tfvars -out=tfplan
