@@ -46,6 +46,7 @@ resource "aws_s3_bucket_logging" "this" {
     count  = var.enable_logging && var.log_bucket != null ? 1 : 0
 
     bucket = aws_s3_bucket.this.id
+    depends_on = [aws_s3_bucket.log_bucket]
     target_bucket = var.log_bucket
     target_prefix = "log/"
 }
