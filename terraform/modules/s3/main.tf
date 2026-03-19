@@ -1,3 +1,5 @@
+#checkov:skip=CKV2_AWS_62:Notification is not required
+#checkov:skip=CKV_AWS_144:Reaplication will be handled separately
 resource "aws_s3_bucket" "this" {
     bucket = var.bucket_name
 }
@@ -11,12 +13,19 @@ resource "aws_s3_bucket_versioning" "this" {
 }
 
 # server side encryption configuration
+resource "aws_kms_key" "this" {
+  description             = "S3 KMS key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   bucket = aws_s3_bucket.this.id
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.this.arn
     }
   }
 }

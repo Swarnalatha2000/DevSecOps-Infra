@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 # Create log_bucket
-module "log_bukcte" {
+module "log_bucket" {
     source         = "../../modules/s3"
 
     bucket_name    = var.buckets["logs"].name
