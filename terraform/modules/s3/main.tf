@@ -143,24 +143,6 @@ data "aws_iam_policy_document" "this" {
   statement {
     effect = "Allow"
 
-    principals {
-      type        = "Service"
-      identifiers = ["s3.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "this" {
-  name               = "s3-replication-role"
-  assume_role_policy = data.aws_iam_policy_document.this.json
-}
-
-data "aws_iam_policy_document" "this" {
-  statement {
-    effect = "Allow"
-
     actions = [
       "s3:GetObject",
       "s3:GetObjectVersion",
@@ -208,6 +190,11 @@ data "aws_iam_policy_document" "this" {
       aws_kms_key.this.arn
     ]
   }
+}
+
+resource "aws_iam_role" "this" {
+  name               = "s3-replication-role"
+  assume_role_policy = data.aws_iam_policy_document.this.json
 }
 
 resource "aws_iam_policy" "this" {
