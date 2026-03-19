@@ -81,7 +81,7 @@ jobs:
         run: terraform init
 
       - name: Show Action Inputs
-        run: echo 'Environment: ${{ env.ENV }}, Action: ${{ env.ACTION }}''
+        run: echo 'Environment: ${{ env.ENV }}, Action: ${{ env.ACTION }}'
 
       - name: Terraform Apply
         if: ${{ env.ACTION == 'apply' }}
