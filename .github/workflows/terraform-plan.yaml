@@ -62,7 +62,7 @@ jobs:
     needs: terraform-plan
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' }}  # Only run apply on manual trigger
-    environment: ${{ env.ENV }}
+    environment: ${{ github.event.inputs.environment || 'dev'}}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
