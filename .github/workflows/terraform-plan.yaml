@@ -61,7 +61,7 @@ jobs:
     name: Terraform Apply/Destroy
     needs: terraform-plan
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'  # Only run apply on manual trigger
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Only run apply on manual trigger
     environment: ${{ env.ENV }}
     steps:
       - name: Checkout code
